@@ -1,4 +1,5 @@
 flowchart TD
     Start[Start] --> Auth[Authenticate]
-    Auth --> Pay[Process Payment]
+    Auth --> Fraud[Fraud Check]
+    Fraud --> Pay[Charge Card]
     Pay --> Done[Done]
