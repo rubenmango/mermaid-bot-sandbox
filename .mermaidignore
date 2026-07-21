@@ -1,0 +1,3 @@
+# .mermaidignore — paths the Mermaid Sync bot must never regenerate.
+# One gitignore-style glob per line. Managed by the Mermaid Chart extension.
+

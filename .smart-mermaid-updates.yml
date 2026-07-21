@@ -1,0 +1,11 @@
+# Smart Mermaid Updates — controls what the Sync bot regenerates (sync)
+# and what triggers the create-on-commit nudge (triggerScope).
+# Managed by the Mermaid Chart extension; safe to hand-edit.
+
+version: 1
+sync:
+  include: []
+  exclude: []
+triggerScope:
+  include: []
+  exclude: []

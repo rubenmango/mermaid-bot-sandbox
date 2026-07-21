@@ -1,4 +1,24 @@
+---
+config:
+  theme: base
+  themeVariables:
+    primaryColor: "#E0095F"
+    primaryTextColor: "#ffffff"
+    primaryBorderColor: "#B80050"
+    lineColor: "#332a54"
+    secondaryColor: "#f9f7f5"
+    fontFamily: "Inter, sans-serif"
+---
 flowchart LR
     A[Sign Up] --> B[Verify Email]
     B --> C[Welcome]
     C --> Profile[Setup Profile]
+    Profile --> Tour[Product Tour]
+    Tour --> Done[Dashboard]
+    Done --> Feedback[Send Feedback]
+    Feedback --> Close[Finish]
+    Close --> Survey[NPS Survey]
+    Survey --> Exit[Exit]
+
+    Exit --> Goodbye[Goodbye]
+%% Mermaid-Sync: regenerated · b3ac8b9
