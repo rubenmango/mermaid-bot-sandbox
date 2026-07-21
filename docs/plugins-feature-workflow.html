@@ -1,0 +1,263 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Feature workflow — plugins</title>
+<style>
+  :root{--bg:#080810;--canvas:#0b0b14;--node:#1a1a26;--line:rgba(255,255,255,.10);--txt:#e8e4dc;--muted:rgba(255,255,255,.55);--faint:rgba(255,255,255,.35);
+    --pa:#4a9eea;--pb:#ff5c8a;--plogin:#9B7BFF;--pmoney:#e0b341;--psug:#5fd0ff;
+    --tracked:#1fae7e;--pending:#d69121;--missing:#e24b4a;--gate:#9B7BFF;--info:#8891a5;}
+  *{box-sizing:border-box}html,body{margin:0;height:100%}
+  body{background:var(--bg);color:var(--txt);font-family:-apple-system,BlinkMacSystemFont,'Inter','Segoe UI',sans-serif;overflow:hidden}
+  #app{display:flex;flex-direction:column;height:100vh}
+  header{padding:12px 18px 9px;border-bottom:1px solid var(--line)}
+  h1{font-size:15px;margin:0;font-weight:600}
+  .sub{font-size:11.5px;color:var(--muted);margin-top:3px}
+  .bar{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:9px}
+  .seg{display:inline-flex;background:rgba(255,255,255,.05);border:1px solid var(--line);border-radius:999px;overflow:hidden}
+  .seg button{background:transparent;border:0;color:var(--muted);font-size:11px;padding:5px 11px;cursor:pointer}
+  .seg button.on{background:rgba(155,123,255,.18);color:#d4c5ff}
+  .tog{display:inline-flex;align-items:center;gap:6px;font-size:11px;color:var(--muted);background:rgba(255,255,255,.05);border:1px solid var(--line);border-radius:999px;padding:4px 11px;cursor:pointer}
+  .tog.on{background:rgba(95,208,255,.16);color:#bfeaff;border-color:rgba(95,208,255,.4)}
+  .ghost{background:transparent;border:1px solid var(--line);color:var(--muted);border-radius:999px;padding:4px 11px;font-size:11px;cursor:pointer}
+  .ghost:hover{color:#fff;border-color:rgba(255,255,255,.3)}
+  .legend{display:flex;gap:11px;align-items:center;margin-left:auto;flex-wrap:wrap}
+  .lg{display:inline-flex;align-items:center;gap:5px;font-size:10px;color:var(--muted)}
+  .dot{width:9px;height:9px;border-radius:50%}
+  #body{flex:1;display:flex;min-height:0}
+  #viewport{flex:1;position:relative;overflow:hidden;background:var(--canvas);cursor:grab}
+  #viewport.grab{cursor:grabbing}
+  #stage{position:absolute;top:0;left:0;transform-origin:0 0}
+  svg#edges{position:absolute;top:0;left:0;overflow:visible;pointer-events:none}
+  .elabel{position:absolute;font-size:9px;color:var(--faint);background:var(--canvas);padding:1px 5px;border-radius:5px;white-space:nowrap;pointer-events:none;border:0.5px solid var(--line)}
+  .cluster{position:absolute;border-radius:18px;border:1px dashed;pointer-events:none;z-index:0}
+  .brandcard{position:absolute;border:1px dashed;border-radius:18px;display:flex;align-items:center;justify-content:center;pointer-events:none;z-index:0}
+  .brandcard svg{width:52px;height:52px;fill:rgba(255,255,255,.9);stroke:none}
+  .brandcard img{width:48px;height:48px;object-fit:contain;opacity:.95}
+  .cluster .cl-lbl{position:absolute;top:8px;left:14px;font-size:9.5px;font-weight:600;letter-spacing:.13em;text-transform:uppercase}
+  .nd{position:absolute;background:var(--node);border:0.5px solid var(--line);border-left:3px solid var(--c,#555);border-radius:11px;padding:8px 11px 8px 9px;cursor:grab;
+    transition:opacity .25s,box-shadow .2s;width:214px;min-height:60px;display:flex;align-items:center;gap:9px;z-index:2}
+  .nd.dragging{cursor:grabbing;z-index:9}
+  .nd.sel{box-shadow:0 0 0 1px var(--c),0 6px 22px rgba(0,0,0,.5)}
+  .nd.dim{opacity:.16}
+  .nd.fdim{opacity:.08}
+  .nd.glow{box-shadow:0 0 0 1.5px var(--c),0 0 24px var(--c)}
+  .nd.start{background:linear-gradient(180deg,#20202e,#171722);border-radius:30px 11px 11px 30px}
+  .nd.terminal{border-radius:11px 30px 30px 11px;border-right:3px solid var(--c)}
+  .nd.decision{border-style:dashed}
+  .nd.sugnode{border-style:dashed}
+  .nd.b-ai .ic{border-radius:50%}
+  .nd.b-ai{background:rgba(23,23,34,.55);border-style:dashed;border-left-style:solid;border-radius:22px}
+  .nd.b-gate .ic{border-radius:50%}
+  .nd.b-gate{box-shadow:0 0 0 1px var(--c)}
+  .step{position:absolute;top:-8px;left:-8px;width:18px;height:18px;border-radius:50%;background:var(--canvas);border:1px solid var(--c);color:var(--txt);font-size:9px;font-weight:600;display:flex;align-items:center;justify-content:center;z-index:3}
+  .ic{width:32px;height:32px;border-radius:8px;flex:none;position:relative;overflow:hidden;display:flex;align-items:center;justify-content:center}
+  .ic img{position:absolute;inset:0;width:100%;height:100%;object-fit:contain}
+  .ic .fb{display:flex;align-items:center;justify-content:center;width:100%;height:100%}
+  .ic svg{width:17px;height:17px;stroke:#fff;fill:none;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
+  .ic svg.fill{fill:#fff;stroke:none}
+  .nc{min-width:0}
+  .nd .t{font-size:11.5px;font-weight:600;line-height:1.22}
+  .nd .m{font-size:9.5px;color:var(--muted);font-family:ui-monospace,Menlo,monospace;margin-top:2px}
+  .nd .brand{font-size:8px;color:var(--faint);text-transform:uppercase;letter-spacing:.08em;margin-top:2px}
+  .nd .tag{position:absolute;top:-8px;right:10px;font-size:8px;font-weight:600;letter-spacing:.05em;text-transform:uppercase;padding:1px 6px;border-radius:999px;background:var(--canvas);border:0.5px solid var(--line);color:var(--faint)}
+  .nd .tag.gated{color:#d4c5ff;border-color:rgba(155,123,255,.4)}
+  .nd .tag.ai{color:#ffd9a1;border-color:rgba(214,145,33,.5)}
+  .nd .tag.startt{color:#9fb6f0;border-color:rgba(111,139,214,.5)}
+  .nd .tag.sugt{color:#bfeaff;border-color:rgba(95,208,255,.5)}
+  .port{position:absolute;width:8px;height:8px;border-radius:50%;top:50%;transform:translateY(-50%);background:#252535;border:1.5px solid #12121e}
+  .port.i{left:-4px}.port.o{right:-4px}
+  .nd.sel .port,.nd.glow .port{background:var(--c)}
+  #zoom{position:absolute;right:14px;bottom:14px;display:flex;gap:6px;align-items:center;background:rgba(8,8,16,.92);border:1px solid rgba(255,255,255,.12);border-radius:999px;padding:5px 7px;backdrop-filter:blur(10px)}
+  #zoom button{width:26px;height:26px;border-radius:50%;background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.12);color:rgba(255,255,255,.75);cursor:pointer;font-size:13px}
+  #zoom button:hover{background:rgba(255,255,255,.16);color:#fff}
+  #zlvl{font-family:ui-monospace,monospace;font-size:10.5px;color:var(--muted);min-width:34px;text-align:center}
+  #focpill{position:absolute;left:50%;bottom:16px;transform:translateX(-50%);display:none;gap:10px;align-items:center;background:rgba(8,8,16,.94);border:1px solid rgba(255,255,255,.12);border-radius:999px;padding:6px 8px 6px 16px;backdrop-filter:blur(10px);z-index:20}
+  #focpill.on{display:flex}
+  #focpill .lbl{font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:var(--muted)}
+  #focpill button{background:rgba(226,75,74,.15);border:1px solid rgba(226,75,74,.3);color:#f87171;border-radius:14px;padding:3px 13px;font-size:11px;cursor:pointer}
+  #side{width:314px;flex:none;border-left:1px solid var(--line);background:#101018;display:flex;flex-direction:column;transition:margin-right .25s}
+  #side.hidden{margin-right:-314px}
+  .sh{display:flex;align-items:center;gap:7px;padding:12px 13px;border-bottom:1px solid var(--line)}
+  .sh .d{width:11px;height:11px;border-radius:50%;flex:none}
+  .sh h2{font-size:12.5px;margin:0;font-weight:600;flex:1;line-height:1.2}
+  .sh button{background:rgba(255,255,255,.06);border:1px solid var(--line);color:var(--muted);border-radius:7px;width:26px;height:26px;flex:none;cursor:pointer;font-size:12px}
+  .sh button.on{background:rgba(155,123,255,.2);color:#d4c5ff;border-color:rgba(155,123,255,.4)}
+  .sc{padding:13px 15px;overflow:auto;font-size:12px}
+  .sc .brandline{display:flex;align-items:center;gap:7px;margin-bottom:10px;flex-wrap:wrap}
+  .sc .pill{font-size:9px;font-weight:600;text-transform:uppercase;letter-spacing:.05em;padding:2px 8px;border-radius:999px}
+  .sc .row{margin-top:12px}
+  .sc .k{color:var(--faint);text-transform:uppercase;letter-spacing:.06em;font-size:9px;margin-bottom:3px}
+  .sc .v{color:var(--txt);font-size:12px;line-height:1.45}
+  .sc .statusrow{display:flex;align-items:center;gap:7px;margin-top:12px;padding-top:11px;border-top:1px solid var(--line)}
+  .sc .statusrow .sd{width:9px;height:9px;border-radius:50%;flex:none}
+  .sc code{font-family:ui-monospace,monospace;font-size:10.5px;color:#d4c5ff;background:rgba(155,123,255,.1);padding:1px 5px;border-radius:5px;word-break:break-word}
+  .sc .hint{color:var(--faint);font-size:11.5px;line-height:1.5}
+  .sc .shot{width:100%;border-radius:8px;border:1px solid var(--line);margin-bottom:10px;cursor:zoom-in;display:block}
+  #lightbox{position:fixed;inset:0;background:rgba(0,0,0,.88);display:none;align-items:center;justify-content:center;z-index:100;cursor:zoom-out;padding:24px}
+  #lightbox.on{display:flex}
+  #lightbox img{max-width:96%;max-height:94%;border-radius:10px;box-shadow:0 24px 70px rgba(0,0,0,.7);border:1px solid rgba(255,255,255,.15)}
+  #lightbox .x{position:absolute;top:18px;right:22px;color:#fff;font-size:24px;opacity:.7}
+</style>
+</head>
+<body>
+<a href="../index.html" style="position:fixed;bottom:14px;left:14px;z-index:9999;font:600 12px/1 -apple-system,BlinkMacSystemFont,Segoe UI,sans-serif;background:rgba(20,20,30,.85);color:#fff;padding:8px 13px;border-radius:999px;text-decoration:none;border:1px solid rgba(255,255,255,.18);backdrop-filter:blur(8px)">← Hub</a>
+<div id="app">
+  <header>
+    <h1>Feature workflow — install → value → login → paid</h1>
+    <div class="sub">Colour follows the story; shapes show structure (clusters · decisions · start/finish · loop). Click a node for details · drag to rearrange · ◎ to focus. Node images load from <code>images/&lt;id&gt;.png</code> (SVG fallback).</div>
+    <div class="bar">
+      <div class="seg" id="filter">
+        <button data-f="all" class="on">Whole journey</button>
+        <button data-f="A">① VS Code</button>
+        <button data-f="B">② GitHub App</button>
+        <button data-f="free">Free / pre-login</button>
+        <button data-f="gated">Login-gated</button>
+      </div>
+      <button class="tog" id="sugTog">💡 Suggestions: off</button>
+      <button class="ghost" id="reset">Reset layout</button>
+      <div class="legend">
+        <span class="lg"><span class="dot" style="background:#4a9eea"></span>VS Code · create</span>
+        <span class="lg"><span class="dot" style="background:#ff5c8a"></span>GitHub · sync</span>
+        <span class="lg"><span class="dot" style="background:#9B7BFF"></span>Login &amp; value</span>
+        <span class="lg"><span class="dot" style="background:#e0b341"></span>Monetize</span>
+        <span class="lg"><span class="dot" style="background:#5fd0ff"></span>Suggestion</span>
+      </div>
+    </div>
+  </header>
+  <div id="body">
+    <div id="viewport">
+      <div id="stage"><svg id="edges"></svg></div>
+      <div id="zoom"><button id="zout">−</button><span id="zlvl">100%</span><button id="zin">+</button><button id="zfit" title="Fit">⊡</button></div>
+      <div id="focpill"><span class="lbl">Focus</span><button id="foc-exit">Exit</button></div>
+    </div>
+    <aside id="side" class="hidden">
+      <div class="sh"><span class="d" id="s-dot"></span><h2 id="s-title">Details</h2>
+        <button id="s-focus" title="Focus this node">◎</button><button id="s-pin" title="Pin sidebar">📌</button><button id="s-close" title="Close">×</button></div>
+      <div class="sc" id="s-body"><span class="hint">Click any node for what it does, its access (free / AI credits / login-gated), the product, and the tracking status + data. Drag nodes to rearrange; ◎ to focus.</span></div>
+    </aside>
+  </div>
+  <div id="lightbox"><span class="x">×</span><img alt=""></div>
+</div>
+<script>
+const IC={play:'<svg class="fill" viewBox="0 0 24 24"><path d="M7 5l12 7-12 7z"/></svg>',code:'<svg viewBox="0 0 24 24"><path d="M8 7l-4 5 4 5M16 7l4 5-4 5"/></svg>',eye:'<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M2 12s3.5-6 10-6 10 6 10 6-3.5 6-10 6S2 12 2 12z"/></svg>',wand:'<svg viewBox="0 0 24 24"><path d="M5 19l9-9M15 5l1 2 2 1-2 1-1 2-1-2-2-1 2-1zM6 6l.7 1.4L8 8l-1.3.6L6 10l-.7-1.4L4 8l1.3-.6z"/></svg>',wrench:'<svg viewBox="0 0 24 24"><path d="M14 7a4 4 0 01-5 4l-5 5 2 2 5-5a4 4 0 014-5l-2 2 1 1 2-2z"/></svg>',spark:'<svg class="fill" viewBox="0 0 24 24"><path d="M12 3l1.7 5.1L19 10l-5.3 1.9L12 17l-1.7-5.1L5 10l5.3-1.9z"/></svg>',cloud:'<svg viewBox="0 0 24 24"><path d="M7 18a4 4 0 010-8 5 5 0 019.6-1.5A3.5 3.5 0 0117.5 18H7z"/><path d="M12 15v-4M12 11l-1.6 1.6M12 11l1.6 1.6"/></svg>',github:'<svg class="fill" viewBox="0 0 24 24"><path d="M12 .297c-6.63 0-12 5.373-12 12 0 5.303 3.438 9.8 8.205 11.385.6.113.82-.258.82-.577 0-.285-.01-1.04-.015-2.04-3.338.724-4.042-1.61-4.042-1.61C4.422 18.07 3.633 17.7 3.633 17.7c-1.087-.744.084-.729.084-.729 1.205.084 1.838 1.236 1.838 1.236 1.07 1.835 2.809 1.305 3.495.998.108-.776.417-1.305.76-1.605-2.665-.3-5.466-1.332-5.466-5.93 0-1.31.465-2.38 1.235-3.22-.135-.303-.54-1.523.105-3.176 0 0 1.005-.322 3.3 1.23.96-.267 1.98-.399 3-.405 1.02.006 2.04.138 3 .405 2.28-1.552 3.285-1.23 3.285-1.23.645 1.653.24 2.873.12 3.176.765.84 1.23 1.91 1.23 3.22 0 4.61-2.805 5.625-5.475 5.92.42.36.81 1.096.81 2.22 0 1.606-.015 2.896-.015 3.286 0 .315.21.69.825.57C20.565 22.092 24 17.592 24 12.297c0-6.627-5.373-12-12-12"/></svg>',vscode:'<svg class="fill" viewBox="0 0 24 24"><path d="M23.15 2.587 18.21.21a1.494 1.494 0 0 0-1.705.29l-9.46 8.63-4.12-3.128a.999.999 0 0 0-1.276.057L.327 7.261A1 1 0 0 0 .326 8.74L3.899 12 .326 15.26a1 1 0 0 0 .001 1.479L1.65 17.94a.999.999 0 0 0 1.276.057l4.12-3.128 9.46 8.63a1.492 1.492 0 0 0 1.704.29l4.942-2.377A1.5 1.5 0 0 0 24 20.06V3.939a1.5 1.5 0 0 0-.85-1.352zm-5.146 14.861L10.826 12l7.178-5.448v10.896z"/></svg>',ghlogo:'<img src="images/pngfind.com-github-logo-png-1766942.png" alt="GitHub" style="width:100%;height:100%;object-fit:contain"/>',bot:'<svg viewBox="0 0 24 24"><rect x="5" y="8" width="14" height="10" rx="2"/><circle cx="9.5" cy="13" r="1"/><circle cx="14.5" cy="13" r="1"/><path d="M12 5v3M8.5 8V6.5M15.5 8V6.5"/></svg>',comment:'<svg viewBox="0 0 24 24"><path d="M4 5h16v11H8l-4 3V5z"/><path d="M8 10.5h.01M12 10.5h.01M16 10.5h.01"/></svg>',branch:'<svg viewBox="0 0 24 24"><circle cx="7" cy="6" r="2"/><circle cx="7" cy="18" r="2"/><circle cx="17" cy="9" r="2"/><path d="M7 8v8M7 13h5a5 5 0 005-4"/></svg>',diff:'<svg viewBox="0 0 24 24"><path d="M8 4v16M4 8h4M15 4v16M12 15h6M12 11h6"/></svg>',list:'<svg viewBox="0 0 24 24"><path d="M9 6h11M9 12h11M9 18h11M4.5 6h.01M4.5 12h.01M4.5 18h.01"/></svg>',key:'<svg viewBox="0 0 24 24"><circle cx="8" cy="12" r="4"/><path d="M11.5 12H21M18 12v3M15 12v2.5"/></svg>',star:'<svg class="fill" viewBox="0 0 24 24"><path d="M12 3l2.5 6.1 6.5.5-5 4.2 1.6 6.4L12 17.4 5.9 20.2 7.5 13.8l-5-4.2 6.5-.5z"/></svg>',sync:'<svg viewBox="0 0 24 24"><path d="M4 12a8 8 0 0113.7-5.7L20 8M20 3.5V8h-4.5"/><path d="M20 12a8 8 0 01-13.7 5.7L4 16M4 20.5V16h4.5"/></svg>',gauge:'<svg viewBox="0 0 24 24"><path d="M4 18a8 8 0 1116 0"/><path d="M12 14l4-3"/></svg>',card:'<svg viewBox="0 0 24 24"><rect x="3" y="6" width="18" height="12" rx="2"/><path d="M3 10h18M7 15h3"/></svg>',people:'<svg viewBox="0 0 24 24"><circle cx="9" cy="9" r="3"/><path d="M3.5 19a5.5 5.5 0 0111 0"/><path d="M16 6.2a3 3 0 010 5.6M20.5 19a5.5 5.5 0 00-3.5-5.1"/></svg>',q:'<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M9.5 9.2a2.5 2.5 0 015 .2c0 1.8-2.5 1.8-2.5 3.6"/><path d="M12 16.5h.01"/></svg>',bulb:'<svg viewBox="0 0 24 24"><path d="M9 18h6M10 21h4M12 3a6 6 0 00-4 10.5c.7.7 1 1.3 1 2.5h6c0-1.2.3-1.8 1-2.5A6 6 0 0012 3z"/></svg>'};
+const BR={vscode:"VS Code",gh:"GitHub",ghbot:"GitHub App · bot",mc:"Mermaid Chart",mai:"Mermaid AI · credits",cop:"Copilot / ChatGPT · credits",git:"Mermaid Chart · Git",none:""};
+const PH={a:"#4a9eea",b:"#ff5c8a",login:"#9B7BFF",money:"#e0b341",sug:"#5fd0ff"};
+const CST={tracked:"#1fae7e",pending:"#d69121",missing:"#e24b4a",gate:"#9B7BFF",info:"#8891a5",sug:"#5fd0ff"};
+function phaseOf(n){if(n.sug)return 'sug';if(n.id==='caps'||n.id==='paid'||n.id==='team')return 'money';if(n.acc==='gate'||n.acc==='gated')return 'login';return n.lane==='A'?'a':'b';}
+const NODES=[
+ {id:"insvs",c:0,r:0,lane:"A",step:1,t:"Installs VS Code extension",m:"START ①",icon:"vscode",brand:"vscode",badge:"start",acc:"free",st:"info",tracker:"VS Code Extension Activated",data:"~325k activated / 60d",detail:"Individual dev installs the extension from the Marketplace. Bottom-up entry — no account needed."},
+ {id:"gen",c:1,r:0,lane:"A",step:2,t:"Generate diagram from code",m:"65.3k / 60d",icon:"code",brand:"vscode",badge:"free",acc:"free",st:"tracked",tracker:"VS Code Generate Diagram From Code",data:"65.3k / 60d — the dominant create action",detail:"CodeLens / command turns a code file into a diagram. The aha moment, free and in-editor."},
+ {id:"prev",c:2,r:0,lane:"A",step:3,t:"Preview diagram",m:"45.5k / 30d",icon:"eye",brand:"vscode",badge:"free",acc:"free",st:"tracked",tracker:"VS Code Preview Tool Invoked",data:"45.5k / 30d",detail:"Inline render of the diagram. Free."},
+ {id:"chat",c:1,r:1,lane:"A",step:2,t:"AI Chat generate",m:"17.6k / 60d",icon:"spark",brand:"cop",badge:"ai",acc:"ai",st:"tracked",tracker:"VS Code AI Chat Generated Diagram",data:"17.6k / 60d",detail:"Generate a diagram through the @mermaid-chart chat participant. Uses AI credits from the user's account (a basic free plan has an allowance)."},
+ {id:"improve",c:2,r:1,lane:"A",step:3,t:"Improve diagram (AI)",m:"5.8k / 30d",icon:"wand",brand:"mai",badge:"ai",acc:"ai",st:"tracked",tracker:"VS Code Improve Diagram Invoked",data:"5.8k / 30d",detail:"AI suggests layout & styling improvements. Consumes AI credits (free-plan allowance applies)."},
+ {id:"repair",c:2,r:2,lane:"A",step:3,t:"Repair diagram (AI)",m:"shipped · 0 so far",icon:"wrench",brand:"mai",badge:"ai",acc:"ai",st:"pending",tracker:"VS_CODE_PLUGIN_REPAIR_DIAGRAM",data:"Event just shipped, 0 so far",detail:"AI fixes broken diagram syntax. Consumes AI credits (free-plan allowance applies). Tracking is brand-new."},
+ {id:"save",c:3,r:0,lane:"A",step:4,t:"Save to cloud (push)",m:"shipped · 0 so far",icon:"cloud",brand:"mc",badge:"gated",acc:"gated",st:"pending",tracker:"VS_CODE_PLUGIN_EDIT_DIAGRAM_IN_MERMAID_CHART",data:"Event shipped, 0 so far",detail:"Persist the diagram to Mermaid Chart. First point where login is asked for."},
+ {id:"insgh",c:0,r:5,lane:"B",step:1,t:"Installs GitHub App (repo)",m:"START ②",icon:"ghlogo",brand:"gh",badge:"start",acc:"free",st:"info",tracker:"—",data:"team / repo-level install",detail:"A team installs the Mermaid Diagram Sync GitHub App on their repo. Top-down entry."},
+ {id:"bot",c:1,r:5,lane:"B",step:2,t:"Bot regenerates diagrams in PR",m:"40.5k / 60d ▲",icon:"bot",brand:"ghbot",badge:"free",acc:"free",st:"tracked",tracker:"GitHub Regenerate Event",data:"40.5k / 60d · 8.2k/wk, a new high",detail:"When source files change in a PR, the bot regenerates the .mmd diagrams on the branch."},
+ {id:"comment",c:2,r:5,lane:"B",step:3,t:"Bot posts PR comment · Before→After",m:"In-PR diff · ⏳ untracked",icon:"comment",brand:"gh",badge:"free",acc:"free",st:"pending",tracker:"In-PR Diff Rendered / Link Clicked (PLUG-89)",data:"Not instrumented yet",detail:"mermaid-diagram-bot posts a PR comment: '🧜 Mermaid Sync — diagram changes in this PR', with Before → After rendered diagrams and a 'Review diagram change' link. GitHub App v2: that link opens the review in the Mermaid Chart web editor (Mermaid AI) — or in VS Code as a Phase 2 option. Anyone on the PR sees the diagram — a reach & re-entry surface. Events not built (PLUG-89)."},
+ {id:"open",img:"openmai",c:3,r:5,lane:"B",step:4,t:"Open review in Mermaid AI (web)",m:"GitHub App v2",icon:"diff",brand:"mai",badge:"free",acc:"free",st:"pending",tracker:"Review link opened → Mermaid AI (PLUG-89)",data:"new · v2 review opener",detail:"GitHub App v2: the 'Review diagram change' link opens the diagram in the Mermaid Chart web editor — build + code review mode. Playground removed (Kasey/Martin) — free users land in the editor; the sign-in gate is here and >3 diagrams prompts upgrade. Deep-link into VS Code review is Phase 2 (see the VS Code node)."},
+ {id:"openvs",img:"open",c:3,r:6,lane:"B",step:4,t:"Open review in VS Code",m:"Phase 2",icon:"vscode",brand:"vscode",badge:"free",acc:"free",st:"pending",tracker:"VS Code PR Review Bot Edit Detected",data:"2 / 30d · P2",detail:"Alternative opener: the 'Review diagram change' link can instead deep-link into VS Code, which flags the bot-edited files on the branch for in-IDE review. This VS Code path is Phase 2 of GitHub App v2 — the Mermaid AI web review ships first."},
+ {id:"review",c:4,r:5,lane:"B",step:5,t:"Single-diagram review · Accept / Reject",m:"~4/wk · free",icon:"diff",brand:"vscode",badge:"free",acc:"free",st:"tracked",tracker:"…Review Triggered / Accepted / Rejected",data:"Triggered ~4/wk · Accept+Reject ~10 / 90d",detail:"Side-by-side diff of one diagram; Accept or Reject. Free — a value moment, never gated."},
+ {id:"seerev",c:5,r:5,lane:"B",step:6,t:"See ALL review changes?",m:"decision",icon:"q",brand:"none",badge:"decision",acc:"free",st:"info",tracker:"—",data:"branch point",detail:"Single diagram stays free. Wanting the aggregated list / Accept-All / sync is where login is asked for."},
+ {id:"multi",c:5,r:4,lane:"B",step:7,t:"Open Changes / Accept All (multi)",m:"wired · ~10/90d",icon:"list",brand:"mc",badge:"gated",acc:"gated",st:"tracked",tracker:"…Review Open Changes / Accept All / Reject All",data:"~10 / 90d total (wired, barely used)",detail:"Clicking 'See review changes' opens the aggregated multi-diagram list + bulk actions + sync back — login-gated."},
+ {id:"gate",c:4,r:2,lane:"C",step:0,t:"🔑 LOGIN — sign in to Mermaid Chart",m:"2% (609k→11.7k /90d)",icon:"key",brand:"mc",badge:"gate",acc:"gate",st:"gate",tracker:"VS Code Extension Activated → VS Code User Logged In",data:"Activate→login = 2% · prompt shown/clicked/completed MISSING (PLUG-98)",detail:"Shown only at persist / see-all-changes / sync — never at the first diagram. Only ~2% cross it today. The prompt-level events don't exist yet."},
+ {id:"val",c:5,r:2,lane:"C",step:0,t:"Value of logging in",m:"persist · sync · team SoT",icon:"star",brand:"mc",badge:"gated",acc:"gated",st:"gate",tracker:"—",data:"Why users log in",detail:"Persist in the cloud · multi-diagram review + Accept All · sync back to Git · a shared source of truth the whole team (incl. non-technical) can browse."},
+ {id:"sync",c:4,r:3,lane:"C",step:0,t:"Create-on-command → sync to Git",m:"shipped · 0 · LOOP",icon:"sync",brand:"git",badge:"gated",acc:"gated",st:"pending",tracker:"VS_CODE_PLUGIN_CONNECT_DIAGRAM · …EDIT_DIAGRAM_LOCALLY",data:"Events shipped, 0 so far",detail:"Pull the latest diagram into the editor and sync changes back to Git — this closes the loop back to the bot, turning the journey into an ongoing workflow."},
+ {id:"caps",c:6,r:1,lane:"C",step:0,t:"Free cap: 3 diagrams / AI credits",m:"no plugin source",icon:"gauge",brand:"none",badge:"cap",acc:"gated",st:"missing",tracker:"Free diagram limit exceed · AI credits limit exceeded",data:"Exist globally but carry NO plugin context",detail:"Free value isn't capped; persistence (3 diagrams) and AI-credit volume are — the upgrade trigger. Invisible from the plugin today."},
+ {id:"paid",c:6,r:2,lane:"C",step:0,t:"Upgrade → paid seat",m:"pluginSource missing",icon:"card",brand:"none",badge:"pay",acc:"gated",st:"missing",terminal:1,tracker:"Upgrade modal opened + pluginSource on paid",data:"pluginSource on paid = MISSING (PLUG-98)",detail:"FINISH (individual). Paid seat lifts the diagram cap and AI credits. Plugin→paid unattributable until pluginSource lands."},
+ {id:"team",c:6,r:3,lane:"C",step:0,t:"Team / PwC: seat 18 → 70",m:"not plugin-tracked",icon:"people",brand:"none",badge:"team",acc:"gated",st:"missing",terminal:1,tracker:"add-to-team prompt / seat assignment",data:"18 of 70 seats assigned (sales)",detail:"FINISH (team). Login connects the dev to their org & a seat → diagrams become a team source of truth → pulls unused seats into use (PwC 18→70). Conversion & expansion, not acquisition."},
+ {id:"sug1",c:3,r:1,lane:"S",step:0,sug:1,t:"💡 Prompt login at the value moment",m:"Q3 primary bet",icon:"bulb",brand:"none",badge:"suggestion",acc:"sug",st:"sug",tracker:"needs Sign-In Prompt Shown/Clicked/Completed",data:"Highest-leverage lever for login",detail:"After a successful create / repair, show a benefit-led sign-in prompt ('save · keep synced'). Never gate the first diagram. This is the single biggest move on the 2% login rate."},
+ {id:"sug2",c:3,r:2,lane:"S",step:0,sug:1,t:"💡 Meter AI credits → in-editor upsell",m:"monetization wedge",icon:"bulb",brand:"none",badge:"suggestion",acc:"sug",st:"sug",tracker:"needs AI Credits Limit Reached + Upgrade Prompt",data:"Rides the highest-volume feature",detail:"When AI credits run low, surface an in-editor meter + upgrade path. First verify VS Code AI actually consumes Mermaid AI credits vs a local library."},
+ {id:"sug3",c:2,r:6,lane:"S",step:0,sug:1,t:"💡 Instrument the In-PR diff comment",m:"PLUG-89",icon:"bulb",brand:"none",badge:"suggestion",acc:"sug",st:"sug",tracker:"In-PR Diff Rendered / Link Clicked",data:"Measures reach + re-entry",detail:"Track the bot comment's render and the 'Open the fuller review' click — the PR comment is a discovery surface (anyone on the PR sees the diagram) we can't currently measure."},
+ {id:"sug4",c:6,r:0,lane:"S",step:0,sug:1,t:"💡 Add pluginSource to paid events",m:"PLUG-98",icon:"bulb",brand:"none",badge:"suggestion",acc:"sug",st:"sug",tracker:"pluginSource on checkout/upgrade",data:"Unlocks plugin→paid ROI",detail:"Stamp pluginSource on paid events so plugin→paid conversion (incl. PwC-style expansion) can finally be measured."}
+];
+const EDGES=[["insvs","gen"],["gen","prev"],["gen","improve"],["insvs","chat"],["chat","repair"],["prev","save"],["improve","save"],["repair","save"],["chat","save"],["save","gate"],
+ ["insgh","bot"],["bot","comment"],["comment","open","→ Mermaid AI (web)"],["comment","openvs","→ VS Code (P2)"],["open","review"],["openvs","review"],["review","seerev"],["seerev","multi","See changes → sign in"],["multi","gate"],
+ ["gate","val"],["val","caps"],["caps","paid"],["paid","team"],["val","team"],["val","sync"],["sync","bot","⟳ workflow loop",1],
+ ["gen","sug1",null,0,1],["sug1","gate",null,0,1],["improve","sug2",null,0,1],["comment","sug3",null,0,1],["paid","sug4",null,0,1]];
+const CLUS=[{lbl:"① VS Code — free create",ids:["insvs","gen","prev","chat","improve","repair","save"],c:PH.a},{lbl:"② GitHub App — team sync",ids:["insgh","bot","comment","open","openvs","review","seerev","multi"],c:PH.b},{lbl:"Login → value → paid / team",ids:["gate","val","sync","caps","paid","team"],c:PH.login}];
+const COLW=300,ROWH=150,NW=214,NH=64,PX=34,PY=54,LEFTPAD=210,IMGDIR="images/";
+const stage=document.getElementById('stage'),svg=document.getElementById('edges'),vp=document.getElementById('viewport');
+const side=document.getElementById('side'),sBody=document.getElementById('s-body'),sTitle=document.getElementById('s-title'),sDot=document.getElementById('s-dot'),sPin=document.getElementById('s-pin'),focpill=document.getElementById('focpill');
+const SVGNS='http://www.w3.org/2000/svg';let pinned=false,curF='all',selId=null,focusId=null,sugOn=false;
+const lb=document.getElementById('lightbox'),lbImg=lb.querySelector('img');
+function openShot(src){lbImg.src=src;lb.classList.add('on');}
+lb.onclick=function(){lb.classList.remove('on');lbImg.src='';};
+function hexA(h,a){const n=parseInt(h.slice(1),16);return 'rgba('+((n>>16)&255)+','+((n>>8)&255)+','+(n&255)+','+a+')';}
+const phOf={};NODES.forEach(function(n){phOf[n.id]=phaseOf(n);});
+const home={},pos={},NEI={};NODES.forEach(function(n){home[n.id]={x:PX+LEFTPAD+n.c*COLW,y:PY+n.r*ROWH};pos[n.id]={x:home[n.id].x,y:home[n.id].y};NEI[n.id]=new Set();});
+EDGES.forEach(function(e){NEI[e[0]].add(e[1]);NEI[e[1]].add(e[0]);});
+// clusters (behind everything)
+const clEls=CLUS.map(function(g){const d=document.createElement('div');d.className='cluster';d.style.borderColor=hexA(g.c,.30);d.style.background=hexA(g.c,.05);d.innerHTML='<span class="cl-lbl" style="color:'+hexA(g.c,.85)+'">'+g.lbl+'</span>';stage.insertBefore(d,svg);return d;});
+const BRANDCARDS=[{ci:0,logo:IC.vscode,c:PH.a},{ci:1,logo:'<img src="images/pngfind.com-github-logo-png-1766942.png" alt="GitHub">',c:PH.b}];
+const bcEls=BRANDCARDS.map(function(b){const d=document.createElement('div');d.className='brandcard';d.style.borderColor=hexA(b.c,.30);d.style.background=hexA(b.c,.05);d.innerHTML=b.logo;stage.insertBefore(d,svg);return d;});
+function updateClusters(){CLUS.forEach(function(g,i){let x1=1e9,y1=1e9,x2=-1e9,y2=-1e9;g.ids.forEach(function(id){const p=pos[id];x1=Math.min(x1,p.x);y1=Math.min(y1,p.y);x2=Math.max(x2,p.x+NW);y2=Math.max(y2,p.y+NH);});const px=24,pt=28,el=clEls[i];el.style.left=(x1-px)+'px';el.style.top=(y1-pt)+'px';el.style.width=((x2-x1)+px*2)+'px';el.style.height=((y2-y1)+pt+px)+'px';});BRANDCARDS.forEach(function(b,j){const clt=parseFloat(clEls[b.ci].style.top),clh=parseFloat(clEls[b.ci].style.height),cy=clt+clh/2,BCH=150;bcEls[j].style.left='16px';bcEls[j].style.width=(LEFTPAD-40)+'px';bcEls[j].style.top=(cy-BCH/2)+'px';bcEls[j].style.height=BCH+'px';});}
+// arrowhead markers
+svg.insertAdjacentHTML('afterbegin','<defs>'+['a','b','login','money','sug'].map(function(k){return '<marker id="ar_'+k+'" markerWidth="7" markerHeight="7" refX="6.5" refY="3" orient="auto"><path d="M0,0 L6,3 L0,6 z" fill="'+PH[k]+'"/></marker>';}).join('')+'</defs>');
+const elMap={};
+NODES.forEach(function(n){const ph=phOf[n.id];const d=document.createElement('div');d.className='nd'+(n.badge==='start'?' start':'')+(n.badge==='decision'?' decision':'')+(n.terminal?' terminal':'')+(n.sug?' sugnode':'')+(n.badge?' b-'+n.badge:'');
+ d.style.setProperty('--c',PH[ph]);d.style.left=pos[n.id].x+'px';d.style.top=pos[n.id].y+'px';if(n.sug)d.style.display='none';
+ const tagcls=n.badge==='start'?'startt':n.badge==='ai'?'ai':n.badge==='suggestion'?'sugt':((n.badge==='gated'||n.badge==='gate')?'gated':'');
+ const stepHtml=(n.step&&n.step>0)?'<span class="step">'+n.step+'</span>':'';
+ const title=(n.badge==='decision'?'◇ ':'')+n.t;
+ const icHtml='<div class="ic" style="background:'+hexA(PH[ph],.16)+'"><span class="fb">'+IC[n.icon]+'</span><img alt="" style="display:none" src="'+IMGDIR+(n.img||n.id)+'.png" onload="this.style.display=\'block\';this.parentNode.querySelector(\'.fb\').style.display=\'none\'" onerror="this.remove()"></div>';
+ d.innerHTML=stepHtml+'<span class="tag '+tagcls+'">'+n.badge+'</span>'+icHtml+'<div class="nc"><div class="t">'+title+'</div><div class="m">'+n.m+'</div>'+(BR[n.brand]?'<div class="brand">'+BR[n.brand]+'</div>':'')+'</div><span class="port i"></span><span class="port o"></span>';
+ stage.appendChild(d);elMap[n.id]=d;
+ d.addEventListener('dblclick',function(e){e.stopPropagation();focus(n.id);});
+ d.addEventListener('pointerdown',function(e){e.stopPropagation();startDrag(n.id,e,d);});});
+function edgePath(a,b){const s=pos[a],t=pos[b];const x1=s.x+NW,y1=s.y+NH/2,x2=t.x,y2=t.y+NH/2;const dx=Math.max(40,Math.abs(x2-x1)*0.4);return 'M'+x1+','+y1+' C'+(x1+dx)+','+y1+' '+(x2-dx)+','+y2+' '+x2+','+y2;}
+const edgeEls=[],labelEls=[];
+EDGES.forEach(function(e){const p=document.createElementNS(SVGNS,'path');p.setAttribute('fill','none');const sph=phOf[e[0]];p.dataset.a=e[0];p.dataset.b=e[1];p.dataset.sug=e[4]?1:0;p.dataset.ph=sph;
+ p.setAttribute('stroke',e[4]?hexA(PH.sug,.55):hexA(PH[sph],.5));p.setAttribute('stroke-width','1.5');p.setAttribute('marker-end','url(#ar_'+(e[4]?'sug':sph)+')');
+ if(e[3]||((NODES.find(function(x){return x.id===e[1];})||{}).badge==='ai'))p.setAttribute('stroke-dasharray','6 4');if(e[4]){p.setAttribute('stroke-dasharray','2 4');p.style.display='none';}
+ svg.appendChild(p);edgeEls.push(p);
+ let lab=null;if(e[2]){lab=document.createElement('div');lab.className='elabel';lab.textContent=e[2];stage.appendChild(lab);}labelEls.push({el:lab,a:e[0],b:e[1]});});
+function redraw(){edgeEls.forEach(function(p){p.setAttribute('d',edgePath(p.dataset.a,p.dataset.b));});labelEls.forEach(function(L){if(!L.el)return;const s=pos[L.a],t=pos[L.b];L.el.style.left=((s.x+NW+t.x)/2-30)+'px';L.el.style.top=((s.y+t.y)/2+NH/2-8)+'px';});updateClusters();}
+const W=PX*2+LEFTPAD+6*COLW+NW+60,H=PY*2+7*ROWH+NH;svg.setAttribute('width',W);svg.setAttribute('height',H);stage.style.width=W+'px';stage.style.height=H+'px';redraw();
+let dragN=null;
+function startDrag(id,e,el){dragN={id,el,sx:e.clientX,sy:e.clientY,ox:pos[id].x,oy:pos[id].y,moved:false};el.classList.add('dragging');if(el.setPointerCapture)el.setPointerCapture(e.pointerId);}
+window.addEventListener('pointermove',function(e){if(!dragN)return;const dx=(e.clientX-dragN.sx)/scale,dy=(e.clientY-dragN.sy)/scale;if(Math.abs(dx)>3||Math.abs(dy)>3)dragN.moved=true;pos[dragN.id].x=dragN.ox+dx;pos[dragN.id].y=dragN.oy+dy;dragN.el.style.left=pos[dragN.id].x+'px';dragN.el.style.top=pos[dragN.id].y+'px';redraw();});
+window.addEventListener('pointerup',function(){if(dragN){dragN.el.classList.remove('dragging');if(!dragN.moved)select(dragN.id);dragN=null;}});
+document.getElementById('reset').onclick=function(){NODES.forEach(function(n){pos[n.id].x=home[n.id].x;pos[n.id].y=home[n.id].y;elMap[n.id].style.left=pos[n.id].x+'px';elMap[n.id].style.top=pos[n.id].y+'px';});redraw();};
+function edgeBase(p){return p.dataset.sug==='1'?hexA(PH.sug,.55):hexA(PH[p.dataset.ph],.5);}
+function paintEdges(id){edgeEls.forEach(function(p){const on=id&&(p.dataset.a===id||p.dataset.b===id);p.setAttribute('stroke',on?PH[phOf[id]]:edgeBase(p));p.setAttribute('stroke-width',on?'2.4':'1.5');p.style.opacity=on?1:(focusId?.06:.7);});}
+function select(id){selId=id;const n=NODES.find(function(x){return x.id===id;});Object.keys(elMap).forEach(function(k){elMap[k].classList.remove('sel');});elMap[id].classList.add('sel');paintEdges(id);
+ const accLbl={free:"Free",ai:"AI credits (free-plan allowance)",gated:"Login-gated",gate:"Login",sug:"Suggestion"}[n.acc];const accCol=n.acc==='free'?'#5fd6a8':n.acc==='ai'?'#ffd9a1':n.acc==='sug'?'#bfeaff':'#d4c5ff';
+ const stLabel={tracked:"Tracked ✓",pending:"Shipped · awaiting data",missing:"Missing tracker",gate:"Login funnel",info:"—",sug:"Proposed"}[n.st];
+ sTitle.textContent=n.t;sDot.style.background=PH[phOf[id]];
+ sBody.innerHTML='<img class="shot" src="'+IMGDIR+(n.img||n.id)+'.png" alt="" onerror="this.remove()" onclick="openShot(this.src)">'+'<div class="brandline"><span class="pill" style="background:'+hexA(accCol,.16)+';color:'+accCol+'">'+accLbl+'</span>'+(BR[n.brand]?'<span class="pill" style="background:rgba(255,255,255,.06);color:var(--muted)">'+BR[n.brand]+'</span>':'')+'</div>'+
+   '<div class="row"><div class="k">What happens</div><div class="v">'+n.detail+'</div></div>'+
+   '<div class="row"><div class="k">Tracker</div><div class="v"><code>'+n.tracker+'</code></div></div>'+
+   '<div class="row"><div class="k">Data</div><div class="v">'+n.data+'</div></div>'+
+   '<div class="statusrow"><span class="sd" style="background:'+CST[n.st]+'"></span><span class="v" style="font-size:11.5px">Tracking: <b style="color:'+CST[n.st]+'">'+stLabel+'</b></span></div>';
+ side.classList.remove('hidden');if(focusId&&focusId!==id)focus(id);}
+function focus(id){focusId=id;select(id);const near=NEI[id];NODES.forEach(function(n){if(n.sug&&!sugOn)return;const keep=(n.id===id||near.has(n.id));elMap[n.id].classList.toggle('fdim',!keep);elMap[n.id].classList.remove('dim');elMap[n.id].classList.toggle('glow',n.id===id);});labelEls.forEach(function(L){if(L.el)L.el.style.opacity=.15;});focpill.classList.add('on');zoomTo(id,1.15);}
+function exitFocus(){focusId=null;NODES.forEach(function(n){elMap[n.id].classList.remove('fdim','glow');});focpill.classList.remove('on');applyFilter(curF);paintEdges(selId);}
+document.getElementById('s-focus').onclick=function(){if(selId){if(focusId===selId)exitFocus();else focus(selId);}};
+document.getElementById('foc-exit').onclick=exitFocus;
+document.getElementById('s-close').onclick=function(){side.classList.add('hidden');pinned=false;sPin.classList.remove('on');if(focusId)exitFocus();};
+sPin.onclick=function(){pinned=!pinned;sPin.classList.toggle('on',pinned);};
+vp.addEventListener('pointerdown',function(){if(!pinned&&!focusId)side.classList.add('hidden');});
+document.getElementById('sugTog').onclick=function(){sugOn=!sugOn;this.classList.toggle('on',sugOn);this.textContent='💡 Suggestions: '+(sugOn?'on':'off');NODES.forEach(function(n){if(n.sug)elMap[n.id].style.display=sugOn?'':'none';});edgeEls.forEach(function(p){if(p.dataset.sug==='1')p.style.display=sugOn?'':'none';});redraw();applyFilter(curF);};
+function isGated(n){return n.acc==='gated'||n.acc==='gate';}
+function applyFilter(f){curF=f;NODES.forEach(function(n){if(n.sug)return;let dim=false;if(f==='A')dim=(n.lane==='B');else if(f==='B')dim=(n.lane==='A');else if(f==='free')dim=isGated(n);else if(f==='gated')dim=!isGated(n);elMap[n.id].classList.toggle('dim',dim);});
+ edgeEls.forEach(function(p){if(p.dataset.sug==='1')return;const a=NODES.find(function(x){return x.id===p.dataset.a;}),bb=NODES.find(function(x){return x.id===p.dataset.b;});let dim=false;if(f==='A')dim=(a.lane==='B'||bb.lane==='B');else if(f==='B')dim=(a.lane==='A'||bb.lane==='A');else if(f==='free')dim=(isGated(a)||isGated(bb));else if(f==='gated')dim=!(isGated(a)||isGated(bb));p.style.opacity=dim?.06:.7;});}
+document.getElementById('filter').addEventListener('click',function(e){const b=e.target.closest('button');if(!b)return;if(focusId)exitFocus();document.querySelectorAll('#filter button').forEach(function(x){x.classList.remove('on');});b.classList.add('on');applyFilter(b.dataset.f);});
+let scale=1,tx=0,ty=0;const zl=document.getElementById('zlvl');
+function apply(){stage.style.transform='translate('+tx+'px,'+ty+'px) scale('+scale+')';zl.textContent=Math.round(scale*100)+'%';}
+function fit(){const vw=vp.clientWidth,vh=vp.clientHeight;scale=Math.min(1,(vw-40)/W,(vh-40)/H);if(scale<.3)scale=.3;tx=(vw-W*scale)/2;ty=Math.max(14,(vh-H*scale)/2);apply();}
+function zoomTo(id,sc){const n=pos[id];scale=sc||1.15;tx=vp.clientWidth/2-(n.x+NW/2)*scale;ty=vp.clientHeight/2-(n.y+NH/2)*scale;apply();}
+document.getElementById('zin').onclick=function(){scale=Math.min(2.4,scale*1.15);apply();};
+document.getElementById('zout').onclick=function(){scale=Math.max(.3,scale/1.15);apply();};
+document.getElementById('zfit').onclick=function(){if(focusId)exitFocus();fit();};
+vp.addEventListener('wheel',function(e){e.preventDefault();const r=vp.getBoundingClientRect();const mx=e.clientX-r.left,my=e.clientY-r.top;const ns=Math.min(2.4,Math.max(.3,scale*(e.deltaY<0?1.1:1/1.1)));tx=mx-(mx-tx)*(ns/scale);ty=my-(my-ty)*(ns/scale);scale=ns;apply();},{passive:false});
+let pan=false,psx,psy;
+vp.addEventListener('pointerdown',function(e){pan=true;psx=e.clientX-tx;psy=e.clientY-ty;vp.classList.add('grab');});
+window.addEventListener('pointermove',function(e){if(!pan||dragN)return;tx=e.clientX-psx;ty=e.clientY-psy;apply();});
+window.addEventListener('pointerup',function(){pan=false;vp.classList.remove('grab');});
+fit();
+</script>
+</body>
+</html>
